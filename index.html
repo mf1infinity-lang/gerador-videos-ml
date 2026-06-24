@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Frídom — Gerador de Vídeos ML</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+  :root {
+    --bg:      #0f0f0f;
+    --surface: #181818;
+    --border:  #2a2a2a;
+    --border2: #333;
+    --accent:  #f97316;
+    --accent2: #ea580c;
+    --text:    #f0f0f0;
+    --muted:   #888;
+    --muted2:  #555;
+    --success: #22c55e;
+    --error:   #ef4444;
+    --warning: #f59e0b;
+    --info:    #3b82f6;
+    --radius:  10px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; font-size: 14px; min-height: 100vh; line-height: 1.5; }
+
+  header { border-bottom: 1px solid var(--border); padding: 18px 32px; display: flex; align-items: center; justify-content: space-between; background: var(--surface); position: sticky; top: 0; z-index: 100; }
+  .logo { font-size: 18px; font-weight: 700; letter-spacing: -.5px; }
+  .logo span { color: var(--accent); }
+  .btn-config { background: none; border: 1px solid var(--border2); color: var(--muted); padding: 6px 14px; border-radius: var(--radius); cursor: pointer; font-size: 13px; font-family: 'Inter', sans-serif; transition: all .2s; }
+  .btn-config:hover { border-color: var(--accent); color: var(--accent); }
+
+  .container { max-width: 1100px; margin: 0 auto; padding: 32px 24px; }
+
+  /* MODAL */
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.75); z-index: 200; align-items: center; justify-content: center; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: var(--surface); border: 1px solid var(--border2); border-radius: 14px; padding: 28px; width: 100%; max-width: 520px; }
+  .modal h3 { font-size: 16px; font-weight: 600; margin-bottom: 20px; }
+  .modal-footer { display: flex; gap: 10px; justify-content: flex-end; margin-top: 24px; }
+
+  /* FIELDS */
+  .field { margin-bottom: 16px; }
+  .field label { display: block; font-size: 12px; font-weight: 500; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: .5px; }
+  .field input, .field textarea { width: 100%; background: var(--bg); border: 1px solid var(--border2); border-radius: var(--radius); color: var(--text); padding: 10px 12px; font-family: 'Inter', sans-serif; font-size: 13px; transition: border-color .2s; outline: none; }
+  .field input:focus, .field textarea:focus { border-color: var(--accent); }
+  .field input[type="password"] { font-family: 'JetBrains Mono', monospace; letter-spacing: 2px; }
+  .dim-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+
+  /* BUTTONS */
+  .btn { padding: 10px 20px; border-radius: var(--radius); border: none; font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 500; cursor: pointer; transition: all .2s; display: inline-flex; align-items: center; gap: 6px; }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { background: var(--accent2); }
+  .btn-primary:disabled { background: var(--muted2); cursor: not-allowed; opacity: .7; }
+  .btn-ghost { background: none; border: 1px solid var(--border2); color: var(--muted); }
+  .btn-ghost:hover { color: var(--text); }
+  .btn-sm { padding: 6px 12px; font-size: 12px; }
+
+  /* MODELO */
+  .modelo-section { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 20px; margin-bottom: 28px; display: flex; align-items: center; gap: 20px; }
+  .modelo-preview { width: 64px; height: 64px; border-radius: 10px; border: 2px dashed var(--border2); display: flex; align-items: center; justify-content: center; overflow: hidden; cursor: pointer; background: var(--bg); flex-shrink: 0; transition: border-color .2s; }
+  .modelo-preview:hover { border-color: var(--accent); }
+  .modelo-preview img { width: 100%; height: 100%; object-fit: cover; }
+  .modelo-info h3 { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+  .modelo-info p { font-size: 12px; color: var(--muted); }
+  .modelo-upload-hint { font-size: 11px; color: var(--accent); margin-top: 4px; cursor: pointer; }
+  .modelo-upload-hint:hover { text-decoration: underline; }
+  #modeloFileInput { display: none; }
+
+  /* ACTIONS */
+  .actions-bar { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px 20px; display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; gap: 12px; flex-wrap: wrap; }
+  .actions-left { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .counter-info { font-size: 13px; color: var(--muted); }
+  .counter-info strong { color: var(--text); }
+
+  /* GRID */
+  .lote-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 14px; margin-bottom: 28px; }
+
+  /* CARD */
+  .card-peca { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; position: relative; transition: border-color .2s; }
+  .card-peca.done      { border-color: #166534; }
+  .card-peca.error     { border-color: #7f1d1d; }
+  .card-peca.active    { border-color: var(--accent); }
+  .card-foto { width: 100%; height: 140px; background: var(--bg); overflow: hidden; }
+  .card-foto img { width: 100%; height: 100%; object-fit: cover; }
+  .card-body { padding: 10px 12px 12px; }
+  .card-nome { font-size: 12px; font-weight: 600; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .card-dim  { font-size: 11px; color: var(--muted); font-family: 'JetBrains Mono', monospace; margin-bottom: 8px; }
+  .card-status { display: flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 500; padding: 4px 8px; border-radius: 6px; width: fit-content; }
+  .s-idle    { background: #1a1a1a; color: var(--muted); }
+  .s-roteiro { background: #1e3a5f; color: #93c5fd; }
+  .s-imagem  { background: #2d1b6b; color: #c4b5fd; }
+  .s-video   { background: #431407; color: #fdba74; }
+  .s-done    { background: #14532d; color: #86efac; }
+  .s-error   { background: #450a0a; color: #fca5a5; }
+  .card-remove { position: absolute; top: 6px; right: 6px; background: rgba(0,0,0,.6); border: none; color: var(--muted); width: 22px; height: 22px; border-radius: 50%; cursor: pointer; font-size: 12px; display: flex; align-items: center; justify-content: center; transition: all .2s; }
+  .card-remove:hover { background: var(--error); color: #fff; }
+  .card-link { display: block; margin-top: 8px; font-size: 11px; color: var(--accent); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .card-link:hover { text-decoration: underline; }
+  .card-err { font-size: 10px; color: var(--error); margin-top: 6px; word-break: break-word; }
+
+  /* ADD CARD */
+  .card-add { background: var(--surface); border: 1px dashed var(--border2); border-radius: 12px; height: 220px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; cursor: pointer; transition: all .2s; color: var(--muted); font-size: 12px; }
+  .card-add:hover { border-color: var(--accent); color: var(--accent); }
+  .plus { font-size: 28px; font-weight: 300; }
+
+  /* PROGRESS */
+  .progress-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 24px; display: none; }
+  .progress-wrap.visible { display: block; }
+  .progress-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  .progress-label { font-size: 13px; font-weight: 500; }
+  .progress-pct { font-size: 13px; color: var(--accent); font-weight: 600; }
+  .progress-bar-bg { background: var(--border); border-radius: 99px; height: 6px; overflow: hidden; }
+  .progress-bar-fill { height: 100%; background: linear-gradient(90deg, var(--accent), #fb923c); border-radius: 99px; transition: width .4s ease; width: 0%; }
+  .progress-detail { font-size: 12px; color: var(--muted); margin-top: 8px; font-family: 'JetBrains Mono', monospace; }
+
+  /* LOG */
+  .log-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; margin-top: 24px; display: none; }
+  .log-wrap.visible { display: block; }
+  .log-header { padding: 12px 16px; border-bottom: 1px solid var(--border); font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; display: flex; justify-content: space-between; align-items: center; }
+  .log-body { padding: 14px 16px; font-family: 'JetBrains Mono', monospace; font-size: 11px; line-height: 1.7; max-height: 220px; overflow-y: auto; }
+  .log-line { display: flex; gap: 10px; }
+  .log-time { color: var(--muted2); flex-shrink: 0; }
+  .log-msg.ok   { color: var(--success); }
+  .log-msg.err  { color: var(--error); }
+  .log-msg.warn { color: var(--warning); }
+  .log-msg.info { color: var(--muted); }
+
+  /* MODAL PEÇA */
+  .modal-peca-grid { display: grid; grid-template-columns: 120px 1fr; gap: 20px; margin-bottom: 20px; }
+  .foto-preview { width: 120px; height: 120px; border-radius: 10px; border: 2px dashed var(--border2); display: flex; align-items: center; justify-content: center; overflow: hidden; cursor: pointer; background: var(--bg); flex-shrink: 0; transition: border-color .2s; }
+  .foto-preview:hover { border-color: var(--accent); }
+  .foto-preview img { width: 100%; height: 100%; object-fit: cover; }
+  .foto-placeholder { display: flex; flex-direction: column; align-items: center; gap: 4px; color: var(--muted2); font-size: 11px; text-align: center; }
+  .foto-placeholder .ico { font-size: 32px; }
+  #pecaFotoInput { display: none; }
+
+  /* SECTION */
+  .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+  .section-header h2 { font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+  .badge { background: var(--border); color: var(--muted); border-radius: 20px; padding: 2px 10px; font-size: 11px; }
+  .badge.acc { background: #f9731620; color: var(--accent); }
+
+  /* EMPTY */
+  .empty-state { text-align: center; padding: 48px 24px; color: var(--muted); grid-column: 1/-1; }
+  .empty-state .ico { font-size: 48px; margin-bottom: 12px; }
+  .empty-state h3 { font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 6px; }
+
+  /* SPINNER */
+  .spin { width: 11px; height: 11px; border: 2px solid transparent; border-top-color: currentColor; border-radius: 50%; animation: rot .7s linear infinite; display: inline-block; }
+  @keyframes rot { to { transform: rotate(360deg); } }
+
+  /* TOAST */
+  #toasts { position: fixed; bottom: 24px; right: 24px; z-index: 999; display: flex; flex-direction: column; gap: 8px; }
+  .toast { background: var(--surface); border: 1px solid var(--border2); border-radius: 10px; padding: 12px 16px; font-size: 13px; display: flex; align-items: center; gap: 10px; min-width: 260px; animation: tin .3s ease; box-shadow: 0 4px 20px rgba(0,0,0,.4); }
+  .toast.success { border-left: 3px solid var(--success); }
+  .toast.error   { border-left: 3px solid var(--error); }
+  .toast.info    { border-left: 3px solid var(--info); }
+  @keyframes tin { from { transform: translateX(40px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Frídom <span>·</span> Gerador ML</div>
+  <button class="btn-config" onclick="openConfig()">⚙️ Configurações</button>
+</header>
+
+<!-- MODAL CONFIG -->
+<div class="modal-overlay" id="modalConfig">
+  <div class="modal">
+    <h3>⚙️ Configurações de API</h3>
+    <div class="field"><label>Higgsfield — API Key ID</label><input type="password" id="cfg_hg_id" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"></div>
+    <div class="field"><label>Higgsfield — API Key Secret</label><input type="password" id="cfg_hg_secret" placeholder="f96bbbc1..."></div>
+    <div class="field"><label>Anthropic — API Key</label><input type="password" id="cfg_ant" placeholder="sk-ant-..."></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeConfig()">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveConfig()">💾 Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL PEÇA -->
+<div class="modal-overlay" id="modalPeca">
+  <div class="modal">
+    <h3>➕ Adicionar Peça</h3>
+    <div class="modal-peca-grid">
+      <div class="foto-preview" id="fotoPreview" onclick="document.getElementById('pecaFotoInput').click()">
+        <div class="foto-placeholder"><span class="ico">📷</span><span>Clique para<br>adicionar foto</span></div>
+      </div>
+      <div>
+        <div class="field"><label>Nome da Peça</label><input type="text" id="pecaNome" placeholder="Ex: Pastilha de Freio Dianteira"></div>
+        <div class="field">
+          <label>Dimensões reais da peça</label>
+          <div class="dim-grid">
+            <input type="text" id="pecaAltura"  placeholder="Altura">
+            <input type="text" id="pecaLargura" placeholder="Largura">
+            <input type="text" id="pecaComp"    placeholder="Comprimento">
+          </div>
+          <div style="font-size:11px;color:var(--muted);margin-top:4px">Ex: 12cm × 8cm × 3cm</div>
+        </div>
+      </div>
+    </div>
+    <input type="file" id="pecaFotoInput" accept="image/*" onchange="onFotoSel(event)">
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closePecaModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="addPeca()">Adicionar</button>
+    </div>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- MODELO -->
+  <div class="modelo-section">
+    <div class="modelo-preview" id="modeloPreview" onclick="document.getElementById('modeloFileInput').click()">
+      <span style="font-size:24px">👤</span>
+    </div>
+    <input type="file" id="modeloFileInput" accept="image/*" onchange="onModeloSel(event)">
+    <div class="modelo-info">
+      <h3>Modelo Fixa</h3>
+      <p id="modeloStatus">Nenhuma foto carregada</p>
+      <span class="modelo-upload-hint" onclick="document.getElementById('modeloFileInput').click()">📎 Clique para carregar a foto da modelo</span>
+    </div>
+  </div>
+
+  <!-- ACTIONS -->
+  <div class="actions-bar">
+    <div class="actions-left">
+      <button class="btn btn-primary" onclick="openPecaModal()">➕ Adicionar Peça</button>
+      <button class="btn btn-ghost" id="btnLimpar" onclick="limparLote()" style="display:none">🗑️ Limpar</button>
+      <span class="counter-info" id="counterInfo" style="display:none"></span>
+    </div>
+    <button class="btn btn-primary" id="btnProcessar" onclick="processarLote()" style="display:none" disabled>▶ Processar Lote</button>
+  </div>
+
+  <!-- PROGRESS -->
+  <div class="progress-wrap" id="progressWrap">
+    <div class="progress-header">
+      <span class="progress-label" id="progressLabel">Processando...</span>
+      <span class="progress-pct"   id="progressPct">0%</span>
+    </div>
+    <div class="progress-bar-bg"><div class="progress-bar-fill" id="progressFill"></div></div>
+    <div class="progress-detail" id="progressDetail"></div>
+  </div>
+
+  <!-- GRID -->
+  <div>
+    <div class="section-header">
+      <h2>Lote de Peças <span class="badge acc" id="loteCount" style="display:none">0</span></h2>
+    </div>
+    <div class="lote-grid" id="loteGrid">
+      <div class="empty-state" id="emptyState">
+        <div class="ico">🔧</div>
+        <h3>Nenhuma peça adicionada</h3>
+        <p>Clique em "Adicionar Peça" para começar</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- LOG -->
+  <div class="log-wrap" id="logWrap">
+    <div class="log-header">
+      <span>📋 Log de Execução</span>
+      <button class="btn btn-ghost btn-sm" onclick="limparLog()">Limpar</button>
+    </div>
+    <div class="log-body" id="logBody"></div>
+  </div>
+</div>
+
+<div id="toasts"></div>
+
+<script>
+// ── Estado ────────────────────────────────────
+let pecas = [];
+let modeloBase64 = null;
+let processando  = false;
+let tempFotoB64  = null;
+const BASE = 'http://localhost:3000';
+
+// ── Config ────────────────────────────────────
+function loadConfig() {
+  document.getElementById('cfg_hg_id').value     = localStorage.getItem('hg_id')     || '';
+  document.getElementById('cfg_hg_secret').value = localStorage.getItem('hg_secret') || '';
+  document.getElementById('cfg_ant').value        = localStorage.getItem('ant_key')   || '';
+}
+function saveConfig() {
+  localStorage.setItem('hg_id',     document.getElementById('cfg_hg_id').value.trim());
+  localStorage.setItem('hg_secret', document.getElementById('cfg_hg_secret').value.trim());
+  localStorage.setItem('ant_key',   document.getElementById('cfg_ant').value.trim());
+  closeConfig();
+  toast('Configurações salvas!', 'success');
+}
+function openConfig()  { loadConfig(); document.getElementById('modalConfig').classList.add('open'); }
+function closeConfig() { document.getElementById('modalConfig').classList.remove('open'); }
+function getCfg() {
+  return {
+    hg_id:     localStorage.getItem('hg_id')     || '',
+    hg_secret: localStorage.getItem('hg_secret') || '',
+    ant_key:   localStorage.getItem('ant_key')   || ''
+  };
+}
+
+// ── Modelo ────────────────────────────────────
+function onModeloSel(e) {
+  const f = e.target.files[0]; if (!f) return;
+  const r = new FileReader();
+  r.onload = ev => {
+    modeloBase64 = ev.target.result;
+    document.getElementById('modeloPreview').innerHTML = `<img src="${modeloBase64}">`;
+    document.getElementById('modeloStatus').textContent = f.name;
+    toast('Modelo carregada!', 'success');
+  };
+  r.readAsDataURL(f);
+}
+
+// ── Modal Peça ────────────────────────────────
+function openPecaModal() {
+  tempFotoB64 = null;
+  ['pecaNome','pecaAltura','pecaLargura','pecaComp'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('fotoPreview').innerHTML = `<div class="foto-placeholder"><span class="ico">📷</span><span>Clique para<br>adicionar foto</span></div>`;
+  document.getElementById('modalPeca').classList.add('open');
+}
+function closePecaModal() { document.getElementById('modalPeca').classList.remove('open'); }
+
+function onFotoSel(e) {
+  const f = e.target.files[0]; if (!f) return;
+  const r = new FileReader();
+  r.onload = ev => {
+    tempFotoB64 = ev.target.result;
+    document.getElementById('fotoPreview').innerHTML = `<img src="${tempFotoB64}">`;
+  };
+  r.readAsDataURL(f);
+}
+
+function addPeca() {
+  const nome    = document.getElementById('pecaNome').value.trim();
+  const altura  = document.getElementById('pecaAltura').value.trim();
+  const largura = document.getElementById('pecaLargura').value.trim();
+  const comp    = document.getElementById('pecaComp').value.trim();
+  if (!nome)      return toast('Informe o nome da peça', 'error');
+  if (!tempFotoB64) return toast('Adicione a foto da peça', 'error');
+  if (!altura || !largura || !comp) return toast('Informe as 3 dimensões', 'error');
+  pecas.push({ id: Date.now(), nome, altura, largura, comp, fotoBase64: tempFotoB64,
+    status: 'idle', statusMsg: 'Aguardando', imagemUrl: null, videoUrl: null, roteiro: null, error: null });
+  closePecaModal();
+  renderGrid();
+  toast(`"${nome}" adicionada!`, 'success');
+}
+
+// ── Render ────────────────────────────────────
+const SL = {
+  idle:    ['s-idle',    '⏳', 'Aguardando'],
+  roteiro: ['s-roteiro', '', 'Gerando roteiro...'],
+  imagem:  ['s-imagem',  '', 'Gerando imagem...'],
+  video:   ['s-video',   '', 'Gerando vídeo...'],
+  done:    ['s-done',    '✅', 'Concluído'],
+  error:   ['s-error',   '❌', 'Erro']
+};
+
+function renderGrid() {
+  const grid = document.getElementById('loteGrid');
+  const empty = document.getElementById('emptyState');
+  const count = document.getElementById('loteCount');
+  const btnP  = document.getElementById('btnProcessar');
+  const btnL  = document.getElementById('btnLimpar');
+  const ci    = document.getElementById('counterInfo');
+
+  if (pecas.length === 0) {
+    grid.innerHTML = '';
+    grid.appendChild(empty);
+    empty.style.display = '';
+    count.style.display = btnP.style.display = btnL.style.display = ci.style.display = 'none';
+    return;
+  }
+  empty.style.display = 'none';
+  count.style.display = '';
+  count.textContent   = pecas.length;
+  btnL.style.display  = processando ? 'none' : '';
+  btnP.style.display  = '';
+  btnP.disabled       = processando;
+
+  const done  = pecas.filter(p => p.status === 'done').length;
+  const erros = pecas.filter(p => p.status === 'error').length;
+  ci.style.display = '';
+  ci.innerHTML = `<strong>${pecas.length}</strong> peças &nbsp;·&nbsp; <strong style="color:var(--success)">${done}</strong> prontas &nbsp;·&nbsp; <strong style="color:var(--error)">${erros}</strong> erros`;
+
+  grid.innerHTML = '';
+  pecas.forEach(p => {
+    const [cls] = SL[p.status];
+    const spinning = !['idle','done','error'].includes(p.status);
+    const ico = spinning ? `<span class="spin"></span>` : SL[p.status][1];
+    const msg = p.statusMsg;
+
+    const c = document.createElement('div');
+    c.className = `card-peca ${p.status==='done'?'done':p.status==='error'?'error':spinning?'active':''}`;
+    c.innerHTML = `
+      <div class="card-foto"><img src="${p.fotoBase64}"></div>
+      ${!processando ? `<button class="card-remove" onclick="removePeca(${p.id})">✕</button>` : ''}
+      <div class="card-body">
+        <div class="card-nome" title="${p.nome}">${p.nome}</div>
+        <div class="card-dim">${p.altura} × ${p.largura} × ${p.comp}</div>
+        <div class="card-status ${cls}">${ico}<span>${msg}</span></div>
+        ${p.videoUrl  ? `<a class="card-link" href="${p.videoUrl}"  target="_blank">▶ Ver vídeo</a>`  : ''}
+        ${p.imagemUrl && !p.videoUrl ? `<a class="card-link" href="${p.imagemUrl}" target="_blank">🖼 Ver imagem</a>` : ''}
+        ${p.error ? `<div class="card-err">${p.error}</div>` : ''}
+      </div>`;
+    grid.appendChild(c);
+  });
+
+  if (!processando) {
+    const a = document.createElement('div');
+    a.className = 'card-add';
+    a.onclick = openPecaModal;
+    a.innerHTML = `<span class="plus">+</span><span>Adicionar peça</span>`;
+    grid.appendChild(a);
+  }
+}
+
+function removePeca(id) { pecas = pecas.filter(p => p.id !== id); renderGrid(); }
+function limparLote()   { if (confirm('Remover todas as peças?')) { pecas = []; renderGrid(); } }
+
+// ── Prog / Log / Toast ────────────────────────
+function setProgress(pct, label, detail='') {
+  document.getElementById('progressWrap').classList.add('visible');
+  document.getElementById('progressLabel').textContent = label;
+  document.getElementById('progressPct').textContent   = pct + '%';
+  document.getElementById('progressFill').style.width  = pct + '%';
+  document.getElementById('progressDetail').textContent = detail;
+}
+function log(msg, tipo='info') {
+  document.getElementById('logWrap').classList.add('visible');
+  const b = document.getElementById('logBody');
+  const d = document.createElement('div');
+  d.className = 'log-line';
+  d.innerHTML = `<span class="log-time">${new Date().toLocaleTimeString('pt-BR')}</span><span class="log-msg ${tipo}">${msg}</span>`;
+  b.appendChild(d);
+  b.scrollTop = b.scrollHeight;
+}
+function limparLog() {
+  document.getElementById('logBody').innerHTML = '';
+  document.getElementById('logWrap').classList.remove('visible');
+}
+function toast(msg, tipo='info') {
+  const icons = { success:'✅', error:'❌', info:'ℹ️' };
+  const el = document.createElement('div');
+  el.className = `toast ${tipo}`;
+  el.innerHTML = `<span>${icons[tipo]||'ℹ️'}</span><span>${msg}</span>`;
+  document.getElementById('toasts').appendChild(el);
+  setTimeout(() => el.remove(), 4500);
+}
+
+// ── API calls (via backend local) ─────────────
+async function apiCall(endpoint, body) {
+  const r = await fetch(`${BASE}${endpoint}`, {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify(body)
+  });
+  const data = await r.json();
+  if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
+  return data;
+}
+
+// ── Processar Lote ────────────────────────────
+function upd(id, u) {
+  const i = pecas.findIndex(p => p.id === id);
+  if (i !== -1) { Object.assign(pecas[i], u); renderGrid(); }
+}
+
+async function processarLote() {
+  const cfg = getCfg();
+  if (!cfg.hg_id || !cfg.hg_secret) return toast('Configure as chaves do Higgsfield', 'error');
+  if (!cfg.ant_key)                  return toast('Configure a chave da Anthropic', 'error');
+  if (!modeloBase64)                 return toast('Carregue a foto da modelo', 'error');
+
+  const pendentes = pecas.filter(p => p.status === 'idle' || p.status === 'error');
+  if (!pendentes.length) return toast('Nenhuma peça pendente', 'info');
+
+  processando = true;
+  renderGrid();
+  log(`Iniciando lote com ${pendentes.length} peça(s)`, 'info');
+
+  const total = pendentes.length * 3;
+  let feitos  = 0;
+
+  for (let i = 0; i < pendentes.length; i++) {
+    const p = pendentes[i];
+    log(`── Peça ${i+1}/${pendentes.length}: ${p.nome}`, 'info');
+
+    // ROTEIRO
+    try {
+      upd(p.id, { status:'roteiro', statusMsg:'Gerando roteiro...', error:null });
+      setProgress(Math.round(feitos/total*100), `Peça ${i+1}/${pendentes.length} — Roteiro`, p.nome);
+      const { roteiro } = await apiCall('/api/roteiro', { nomePeca: p.nome, antKey: cfg.ant_key });
+      p.roteiro = roteiro;
+      log(`  ✓ Roteiro: "${roteiro.slice(0,55)}..."`, 'ok');
+      feitos++;
+    } catch(e) {
+      log(`  ✗ Roteiro: ${e.message}`, 'err');
+      upd(p.id, { status:'error', statusMsg:'Erro no roteiro', error: e.message });
+      feitos += 3; continue;
+    }
+
+    // IMAGEM
+    try {
+      upd(p.id, { status:'imagem', statusMsg:'Gerando imagem (~30s)...' });
+      setProgress(Math.round(feitos/total*100), `Peça ${i+1}/${pendentes.length} — Imagem`, p.nome);
+      log(`  Gerando imagem com Nano Banana Pro...`, 'info');
+      const dimensoes = `altura ${p.altura}, largura ${p.largura}, comprimento ${p.comp}`;
+      const { url: imagemUrl } = await apiCall('/api/imagem', {
+        nomePeca: p.nome, dimensoes,
+        modeloBase64, pecaBase64: p.fotoBase64,
+        hgId: cfg.hg_id, hgSecret: cfg.hg_secret
+      });
+      p.imagemUrl = imagemUrl;
+      upd(p.id, { imagemUrl });
+      log(`  ✓ Imagem: ${imagemUrl}`, 'ok');
+      feitos++;
+    } catch(e) {
+      log(`  ✗ Imagem: ${e.message}`, 'err');
+      upd(p.id, { status:'error', statusMsg:'Erro na imagem', error: e.message });
+      feitos += 2; continue;
+    }
+
+    // VÍDEO
+    try {
+      upd(p.id, { status:'video', statusMsg:'Gerando vídeo (~2-3 min)...' });
+      setProgress(Math.round(feitos/total*100), `Peça ${i+1}/${pendentes.length} — Vídeo`, p.nome);
+      log(`  Gerando vídeo com Kling 3.0...`, 'info');
+      const { url: videoUrl } = await apiCall('/api/video', {
+        nomePeca: p.nome, imagemUrl: p.imagemUrl,
+        roteiro: p.roteiro,
+        hgId: cfg.hg_id, hgSecret: cfg.hg_secret
+      });
+      p.videoUrl = videoUrl;
+      upd(p.id, { status:'done', statusMsg:'Concluído ✅', videoUrl });
+      log(`  ✓ Vídeo: ${videoUrl}`, 'ok');
+      feitos++;
+    } catch(e) {
+      log(`  ✗ Vídeo: ${e.message}`, 'err');
+      upd(p.id, { status:'error', statusMsg:'Erro no vídeo', error: e.message });
+      feitos++;
+    }
+  }
+
+  processando = false;
+  setProgress(100, 'Lote concluído!', '');
+  renderGrid();
+  const done  = pecas.filter(p => p.status === 'done').length;
+  const erros = pecas.filter(p => p.status === 'error').length;
+  log(`Finalizado: ${done} prontos, ${erros} com erro`, done > 0 ? 'ok' : 'warn');
+  toast(`Pronto! ${done} vídeo(s) gerado(s)${erros ? `, ${erros} com erro` : ''}`, done > 0 ? 'success' : 'error');
+}
+
+// ── Init ──────────────────────────────────────
+renderGrid();
+document.querySelectorAll('.modal-overlay').forEach(m =>
+  m.addEventListener('click', e => { if (e.target === m) m.classList.remove('open'); })
+);
+</script>
+</body>
+</html>
